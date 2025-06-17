@@ -1,17 +1,30 @@
 #pragma once
+#include "mqtt.h"
+#include "version.h"
 #include <string>
+std::string get_current_ip();
 
-// Device
-const std::string device = R"({
+// Макросы для преобразования версий в строку
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define SW_VERSION          \
+    TOSTRING(VERSION_MAJOR) \
+    "." TOSTRING(VERSION_MINOR) "." TOSTRING(VERSION_PATCH)
+
+inline std::string get_device_json()
+{
+    std::string ip = get_current_ip();
+    return R"({
   "device": {
     "name": "HDD Station",
     "model": "HDD Station",
     "ids": "DockHDD24D7EB118208",
     "mf": "Игорь Смоляков",
-    "sw": "2.00",
-    "hw": "1.01",
-    "cu": "http://192.168.88.13"
-  },)";
+    "sw": ")" SW_VERSION R"(",
+    "cu": "http://)"
+        + ip + R"("
+  })";
+}
 
 // Device left HDD
 const std::string topic_left = R"(homeassistant/sensor/HDDdock_temp_left/config)";

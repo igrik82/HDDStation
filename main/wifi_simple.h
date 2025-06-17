@@ -23,6 +23,7 @@
 #include "nvs_flash.h" // IWYU pragma: keep
 #include "secrets.h" // IWYU pragma: keep
 #include <cstring>
+#include <string>
 
 // Power mode Wi-FI
 #if CONFIG_WIFI_PS_NONE
@@ -69,8 +70,9 @@ private:
 
     static wifi_init_config_t _wifi_init_config;
     static wifi_config_t wifi_config;
-
     static state_w _state;
+
+    static std::string ip;
 
     void _led_blink(void);
     esp_err_t _led_on(void);
@@ -90,6 +92,7 @@ public:
     ~Wifi(void) = default;
     esp_err_t start(void);
     esp_err_t stop(void);
+    static std::string get_ip(void) { return ip; }
     constexpr static const char* TAG = "Wi-Fi";
 };
 

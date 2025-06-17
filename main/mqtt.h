@@ -6,12 +6,14 @@
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "lwip/ip4_addr.h"
 #include "mdns.h" // IWYU pragma: keep
 #include "mqtt_client.h"
 #include "mqtt_device.h" // IWYU pragma: keep
 #include "nvs_flash.h" // IWYU pragma: keep
 #include "ota.h" // IWYU pragma: keep
 #include "secrets.h" // IWYU pragma: keep
+#include "tcpip_adapter.h"
 #include <cstdint>
 
 extern "C" {
@@ -102,6 +104,8 @@ public:
     void publish(void);
     void stop();
     void start();
+
+    std::string get_current_ip();
 
     constexpr static const char* TAG = "MQTT";
     constexpr static const char* TAG_mDNS = "mDNS";

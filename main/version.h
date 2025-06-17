@@ -4,3 +4,4 @@
 #define VERSION_MINOR 1
 #define VERSION_PATCH 1
 
+#define HW_VERSION 2.0

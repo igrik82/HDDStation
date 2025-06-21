@@ -1,10 +1,12 @@
 #include "mqtt.h"
 #include "esp_err.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_system.h"
 #include "mqtt_device.h"
 #include "portmacro.h"
 #include "projdefs.h"
+#include "secrets.h"
 #include <cstddef>
 
 std::string get_current_ip()
@@ -31,13 +33,15 @@ esp_mqtt_client_config_t Mqtt::mqtt_cfg {};
 
 // Constructor
 Mqtt::Mqtt(EventGroupHandle_t& common_event_group,
-    QueueHandle_t& temperature_queue, QueueHandle_t& percent_queue)
+    QueueHandle_t& temperature_queue, QueueHandle_t& percent_queue,
+    CalibrationData_t* calibration_data)
     : _state(state_m::NOT_INITIALISED)
     , _common_event_group(&common_event_group)
     , _sensor_queue(&temperature_queue)
     , _percent_queue(&percent_queue)
     , _mdns_mqtt_server({})
 {
+    _calibration_data = *calibration_data;
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
         WIFI_EVENT_STA_DISCONNECTED,
@@ -297,8 +301,8 @@ esp_err_t Mqtt::mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
                 is_http_running = true;
                 vTaskDelete(get_temperature_handle);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 2, NULL, 5,
-                    &http_server_handle);
+                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 4,
+                    &_calibration_data, 5, &http_server_handle);
 
             } else if (strncmp(event->data, "DISABLE_HTTP", event->data_len) == 0) {
                 // Restart because OTA conflicting after http server disable

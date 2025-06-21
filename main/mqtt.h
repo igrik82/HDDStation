@@ -6,14 +6,12 @@
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "lwip/ip4_addr.h"
 #include "mdns.h" // IWYU pragma: keep
 #include "mqtt_client.h"
 #include "mqtt_device.h" // IWYU pragma: keep
 #include "nvs_flash.h" // IWYU pragma: keep
 #include "ota.h" // IWYU pragma: keep
 #include "secrets.h" // IWYU pragma: keep
-#include "tcpip_adapter.h"
 #include <cstdint>
 
 extern "C" {
@@ -94,9 +92,11 @@ private:
     MdnsMqttServer_t _mdns_mqtt_server;
     state_m _mdns_interface_state { state_m::NOT_INITIALISED };
 
+    CalibrationData_t _calibration_data {};
+
 public:
     Mqtt(EventGroupHandle_t& common_event_group, QueueHandle_t& temperature_queue,
-        QueueHandle_t& percent_queue);
+        QueueHandle_t& percent_queue, CalibrationData_t* calibration_data);
     ~Mqtt(void);
     bool find_mqtt_server(MdnsMqttServer_t& mqtt_server);
     void connection_watcher();

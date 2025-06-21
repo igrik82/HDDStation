@@ -1,12 +1,20 @@
 #include "http.h"
+#include "secrets.h"
+#include "string.h"
+#include <cstring>
 
 namespace Http_NS {
 
 httpd_handle_t HttpServer::_server = NULL;
 esp_vfs_spiffs_conf_t HttpServer::spiffs_config;
+CalibrationData_t* HttpServer::_calibration_data = nullptr;
 
-HttpServer::HttpServer(void)
+HttpServer::HttpServer(CalibrationData_t* calibration_data)
 {
+
+    HttpServer::_calibration_data = calibration_data;
+    ESP_LOGI(HttpServer::TAG, "%s", _calibration_data->wifi_ssid);
+    ESP_LOGI(HttpServer::TAG, "%s", _calibration_data->wifi_password);
     // initialize and mounting SPIFFS
     spiffs_config.base_path = "/spiffs";
     spiffs_config.partition_label = "storage";
@@ -49,6 +57,7 @@ HttpServer::~HttpServer(void)
     }
 }
 
+// ======================== Root address handler "/" ========================
 /* An HTTP GET handler */
 static esp_err_t root_get_handler(httpd_req_t* req)
 {
@@ -104,6 +113,35 @@ httpd_uri_t root_dir = { .uri = "/",
     .handler = root_get_handler,
     .user_ctx = NULL };
 
+// ======================== "/get-wifi-settings" ========================
+static esp_err_t wifi_settings_get_handler(httpd_req_t* req)
+{
+
+    cJSON* root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "ssid",
+        HttpServer::_calibration_data->wifi_ssid);
+    ESP_LOGI(HttpServer::TAG, "SSID: %s",
+        HttpServer::_calibration_data->wifi_ssid);
+    cJSON_AddStringToObject(root, "wifi_password",
+        HttpServer::_calibration_data->wifi_password);
+    ESP_LOGI(HttpServer::TAG, "Password: %s",
+        HttpServer::_calibration_data->wifi_password);
+
+    const char* json_str = cJSON_Print(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json_str, strlen(json_str));
+
+    cJSON_Delete(root);
+    free((void*)json_str);
+    return ESP_OK;
+}
+
+httpd_uri_t wifi_settings_get = { .uri = "/get-wifi-settings",
+    .method = HTTP_GET,
+    .handler = wifi_settings_get_handler,
+    .user_ctx = NULL };
+// ======================================================================
+
 void HttpServer::_connect_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
 {
@@ -128,6 +166,7 @@ esp_err_t HttpServer::start_webserver(void)
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(_server, &root_dir);
+        httpd_register_uri_handler(_server, &wifi_settings_get);
         // httpd_register_uri_handler(server, &echo);
         // httpd_register_uri_handler(server, &ctrl);
         return ESP_OK;

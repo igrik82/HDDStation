@@ -22,7 +22,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h" // IWYU pragma: keep
 #include "secrets.h" // IWYU pragma: keep
-#include <cstring>
+#include <cstring> // IWYU pragma: keep
 #include <string>
 
 // Power mode Wi-FI
@@ -88,7 +88,7 @@ private:
     static esp_err_t _init_wifi(void);
 
 public:
-    Wifi(void);
+    Wifi(char* wifi_ssid, char* wifi_password);
     ~Wifi(void) = default;
     esp_err_t start(void);
     esp_err_t stop(void);

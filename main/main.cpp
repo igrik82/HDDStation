@@ -9,8 +9,10 @@
 #include "gpio.h" // IWYU pragma: keep
 #include "http.h" // IWYU pragma: keep
 #include "mqtt.h"
+#include "nvs.h"
 #include "nvs_flash.h"
 #include "ota.h"
+#include "secrets.h"
 #include "wifi_simple.h"
 #include <cmath>
 #include <cstdint>
@@ -79,7 +81,9 @@ void fan_control(void* pvParameter)
 TaskHandle_t http_server_handle = NULL;
 void http_server(void* pvParameter)
 {
-    Http_NS::HttpServer server;
+    // Get NVS object
+    CalibrationData_t* calibration_data = static_cast<CalibrationData_t*>(pvParameter);
+    Http_NS::HttpServer server(calibration_data);
 
     if (server.start_webserver() != ESP_OK) {
         is_http_running = false;
@@ -99,8 +103,13 @@ void http_server(void* pvParameter)
 TaskHandle_t wifi_connection_handle = NULL;
 void wifi_connection(void* pvParameter)
 {
+    // Read wifi credentials
+    CalibrationData_t* calibration_data = static_cast<CalibrationData_t*>(pvParameter);
+    char* wifi_ssid = calibration_data->wifi_ssid;
+    char* wifi_password = calibration_data->wifi_password;
+
     // Wifi initialization
-    Wifi_NS::Wifi wifi;
+    Wifi_NS::Wifi wifi(wifi_ssid, wifi_password);
     for (;;) {
         wifi.start();
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -205,7 +214,9 @@ void mqtt_connection(void* pvParameter)
 {
     // TaskHandle_t tasks_handles[] = { http_server_handle, get_temperature_handle
     // };
-    Mqtt_NS::Mqtt mqtt(common_event_group, temperature_queue, duty_percent_queue);
+    CalibrationData_t* calibration_data = static_cast<CalibrationData_t*>(pvParameter);
+    Mqtt_NS::Mqtt mqtt(common_event_group, temperature_queue, duty_percent_queue,
+        calibration_data);
     for (;;) {
         mqtt.publish();
         mqtt.connection_watcher();
@@ -261,18 +272,25 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_netif_init());
 
+    // Create NVS global object
+    Nvs_NS::Nvs nvs("Storage");
+    CalibrationData_t calibration_data {};
+    nvs.read_str(WIFI_SSID_KEY, calibration_data.wifi_ssid, WIFI_SSID);
+    nvs.read_str(WIFI_PASSWORD_KEY, calibration_data.wifi_password,
+        WIFI_PASSWORD);
+
     // ======================= Tasks Looping ==================================
 
-    xTaskCreate(&wifi_connection, "Wifi", STACK_TASK_SIZE, NULL, 5,
+    xTaskCreate(&wifi_connection, "Wifi", STACK_TASK_SIZE, &calibration_data, 5,
         &wifi_connection_handle);
 
-    xTaskCreate(&mqtt_connection, "Mqtt", STACK_TASK_SIZE, NULL, 5,
+    xTaskCreate(&mqtt_connection, "Mqtt", STACK_TASK_SIZE, &calibration_data, 5,
         &mqtt_connection_handle);
 
-    xTaskCreate(&get_temperature, "Temperature", STACK_TASK_SIZE, NULL, 5,
+    xTaskCreate(&get_temperature, "Temperature", STACK_TASK_SIZE, &nvs, 5,
         &get_temperature_handle);
 
-    xTaskCreate(&fan_control, "FanControl", STACK_TASK_SIZE, NULL, 5, NULL);
+    xTaskCreate(&fan_control, "FanControl", STACK_TASK_SIZE, &nvs, 5, NULL);
 
     // Debug tasks
     // xTaskCreate(checkStackUsage, "CheckStack", STACK_TASK_SIZE, NULL, 5, NULL);

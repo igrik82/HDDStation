@@ -7,14 +7,25 @@ namespace Http_NS {
 
 httpd_handle_t HttpServer::_server = NULL;
 esp_vfs_spiffs_conf_t HttpServer::spiffs_config;
-CalibrationData_t* HttpServer::_calibration_data = nullptr;
+Nvs_NS::Nvs* HttpServer::_nvs = nullptr;
 
-HttpServer::HttpServer(CalibrationData_t* calibration_data)
+HttpServer::HttpServer(Nvs_NS::Nvs* nvs)
 {
 
-    HttpServer::_calibration_data = calibration_data;
-    ESP_LOGI(HttpServer::TAG, "%s", _calibration_data->wifi_ssid);
-    ESP_LOGI(HttpServer::TAG, "%s", _calibration_data->wifi_password);
+    HttpServer::_nvs = nvs;
+
+    char wifi_ssid[18] = { 0 };
+    char wifi_password[24] = { 0 };
+    // char wifi_ssid_key[] = WIFI_SSID_KEY;
+    // char wifi_ssid_def[] = WIFI_SSID;
+    char wifi_password_key[] = WIFI_PASSWORD_KEY;
+    char wifi_password_def[] = WIFI_PASSWORD;
+
+    _nvs->read_str(WIFI_SSID_KEY, wifi_ssid, WIFI_SSID);
+    // _nvs->read_str(wifi_password_key, wifi_password, wifi_password_def);
+    ESP_LOGI(HttpServer::TAG, "%s", wifi_ssid);
+    ESP_LOGI(HttpServer::TAG, "%s", wifi_password);
+
     // initialize and mounting SPIFFS
     spiffs_config.base_path = "/spiffs";
     spiffs_config.partition_label = "storage";
@@ -118,14 +129,14 @@ static esp_err_t wifi_settings_get_handler(httpd_req_t* req)
 {
 
     cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "ssid",
-        HttpServer::_calibration_data->wifi_ssid);
-    ESP_LOGI(HttpServer::TAG, "SSID: %s",
-        HttpServer::_calibration_data->wifi_ssid);
-    cJSON_AddStringToObject(root, "wifi_password",
-        HttpServer::_calibration_data->wifi_password);
-    ESP_LOGI(HttpServer::TAG, "Password: %s",
-        HttpServer::_calibration_data->wifi_password);
+    // cJSON_AddStringToObject(root, "ssid",
+    //     HttpServer::_calibration_data->wifi_ssid);
+    // ESP_LOGI(HttpServer::TAG, "SSID: %s",
+    //     HttpServer::_calibration_data->wifi_ssid);
+    // cJSON_AddStringToObject(root, "wifi_password",
+    //     HttpServer::_calibration_data->wifi_password);
+    // ESP_LOGI(HttpServer::TAG, "Password: %s",
+    //     HttpServer::_calibration_data->wifi_password);
 
     const char* json_str = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");

@@ -7,6 +7,7 @@
 #include "esp_log.h" // IWYU pragma: keep
 #include "esp_spiffs.h" // IWYU pragma: keep
 #include "freertos/task.h"
+#include "nvs.h"
 #include "secrets.h" // IWYU pragma: keep
 #include <cstddef> // IWYU pragma: keep
 #include <esp_http_server.h>
@@ -22,14 +23,14 @@ private:
         int32_t event_id, void* event_data);
 
 public:
-    HttpServer(CalibrationData_t* calibration_data);
+    HttpServer(Nvs_NS::Nvs* nvs);
     ~HttpServer(void);
     static httpd_handle_t _server;
     constexpr static const char* TAG = "HTTPServer";
     constexpr static const char* TAG_SPIFF = "SPIFFS";
     static esp_vfs_spiffs_conf_t spiffs_config;
 
-    static CalibrationData_t* _calibration_data;
+    static Nvs_NS::Nvs* _nvs;
 
     static esp_err_t start_webserver(void);
     static void stop_webserver(void);

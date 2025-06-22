@@ -1,5 +1,5 @@
 #pragma once
-#include "mqtt.h"
+#include "mqtt.h" // IWYU pragma: keep
 #include "version.h"
 #include <string>
 std::string get_current_ip();

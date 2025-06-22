@@ -1,13 +1,4 @@
 #include "mqtt.h"
-#include "esp_err.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "esp_system.h"
-#include "mqtt_device.h"
-#include "portmacro.h"
-#include "projdefs.h"
-#include "secrets.h"
-#include <cstddef>
 
 std::string get_current_ip()
 {
@@ -30,18 +21,32 @@ namespace Mqtt_NS {
 
 // Static variables
 esp_mqtt_client_config_t Mqtt::mqtt_cfg {};
+Nvs_NS::Nvs* Mqtt::_nvs = nullptr;
 
 // Constructor
 Mqtt::Mqtt(EventGroupHandle_t& common_event_group,
     QueueHandle_t& temperature_queue, QueueHandle_t& percent_queue,
-    CalibrationData_t* calibration_data)
+    Nvs_NS::Nvs* nvs)
     : _state(state_m::NOT_INITIALISED)
     , _common_event_group(&common_event_group)
     , _sensor_queue(&temperature_queue)
     , _percent_queue(&percent_queue)
     , _mdns_mqtt_server({})
 {
-    _calibration_data = *calibration_data;
+    Mqtt::_nvs = nvs;
+
+    char wifi_ssid[18] = { 0 };
+    char wifi_password[24] = { 0 };
+    char wifi_ssid_key[] = WIFI_SSID_KEY;
+    char wifi_ssid_def[] = WIFI_SSID;
+    char wifi_password_key[] = WIFI_PASSWORD_KEY;
+    char wifi_password_def[] = WIFI_PASSWORD;
+
+    Mqtt::_nvs->read_str(wifi_ssid_key, wifi_ssid, wifi_ssid_def);
+    Mqtt::_nvs->read_str(wifi_password_key, wifi_password, wifi_password_def);
+    ESP_LOGI(TAG, "%s", wifi_ssid);
+    ESP_LOGI(TAG, "%s", wifi_password);
+
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
         WIFI_EVENT_STA_DISCONNECTED,
@@ -301,8 +306,8 @@ esp_err_t Mqtt::mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
                 is_http_running = true;
                 vTaskDelete(get_temperature_handle);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 4,
-                    &_calibration_data, 5, &http_server_handle);
+                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 2,
+                    Mqtt::_nvs, 5, &http_server_handle);
 
             } else if (strncmp(event->data, "DISABLE_HTTP", event->data_len) == 0) {
                 // Restart because OTA conflicting after http server disable

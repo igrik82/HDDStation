@@ -4,22 +4,22 @@
 #include "esp_event.h"
 #include "esp_log.h" // IWYU pragma: keep
 #include "mqtt.h"
-#include <cfloat>
+#include <cfloat> // IWYU pragma: keep
 #include <cstdint>
 
 namespace Fan_NS {
 
 // Constants
-constexpr uint8_t MIN_TEMP_HDD { 25 };
-constexpr uint8_t MAX_TEMP_HDD { 40 };
 constexpr uint32_t LOW_SPEED_MODE_TIMER = 8000;
-
-constexpr uint32_t _freq_hz { 1000 }; // LOW MODE - 100 Hz - 1000 Hz
 static constexpr uint8_t NUM_MEAS = 6; // Number of measurements
 
 class FanPWM {
 
 protected:
+    uint32_t* _min_temp_hdd = nullptr;
+    uint32_t* _max_temp_hdd = nullptr;
+    uint32_t* _freq_hz = nullptr; // LOW MODE - 100 HZ - 1000 HZ
+
     ledc_mode_t _speed_mode { LEDC_LOW_SPEED_MODE };
     ledc_timer_bit_t _duty_resolution { LEDC_TIMER_10_BIT };
     ledc_timer_t _timer_num { LEDC_TIMER_0 };
@@ -46,11 +46,8 @@ protected:
 public:
     // Constructor
     FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-        QueueHandle_t* duty_percent_queue);
-    FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-        QueueHandle_t* duty_percent_queue, uint32_t freq_hz);
-    FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-        QueueHandle_t* duty_percent_queue, uint32_t freq_hz, uint32_t duty);
+        QueueHandle_t* duty_percent_queue, uint32_t* freq_hz,
+        uint32_t* min_temp_hdd, uint32_t* max_temp_hdd);
 
     // Setting duty and frequency
     esp_err_t set_duty(uint32_t duty);

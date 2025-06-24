@@ -19,7 +19,6 @@ Wifi::Wifi(char* wifi_ssid, char* wifi_password)
 {
 
     tcpip_adapter_init();
-    ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_wifi_init(&_wifi_init_config));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
         &_event_handler, NULL));

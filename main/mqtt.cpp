@@ -1,4 +1,7 @@
 #include "mqtt.h"
+#include "nvs.h"
+#include "secrets.h"
+#include <cstdint>
 
 std::string get_current_ip()
 {
@@ -21,32 +24,16 @@ namespace Mqtt_NS {
 
 // Static variables
 esp_mqtt_client_config_t Mqtt::mqtt_cfg {};
-Nvs_NS::Nvs* Mqtt::_nvs = nullptr;
 
 // Constructor
 Mqtt::Mqtt(EventGroupHandle_t& common_event_group,
-    QueueHandle_t& temperature_queue, QueueHandle_t& percent_queue,
-    Nvs_NS::Nvs* nvs)
+    QueueHandle_t& temperature_queue, QueueHandle_t& percent_queue)
     : _state(state_m::NOT_INITIALISED)
     , _common_event_group(&common_event_group)
     , _sensor_queue(&temperature_queue)
     , _percent_queue(&percent_queue)
     , _mdns_mqtt_server({})
 {
-    Mqtt::_nvs = nvs;
-
-    char wifi_ssid[18] = { 0 };
-    char wifi_password[24] = { 0 };
-    char wifi_ssid_key[] = WIFI_SSID_KEY;
-    char wifi_ssid_def[] = WIFI_SSID;
-    char wifi_password_key[] = WIFI_PASSWORD_KEY;
-    char wifi_password_def[] = WIFI_PASSWORD;
-
-    Mqtt::_nvs->read_str(wifi_ssid_key, wifi_ssid, wifi_ssid_def);
-    Mqtt::_nvs->read_str(wifi_password_key, wifi_password, wifi_password_def);
-    ESP_LOGI(TAG, "%s", wifi_ssid);
-    ESP_LOGI(TAG, "%s", wifi_password);
-
     // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
         WIFI_EVENT_STA_DISCONNECTED,
@@ -169,13 +156,26 @@ void Mqtt::init(void)
     xQueueAddToSet(*_sensor_queue, _queue_set);
     xQueueAddToSet(*_percent_queue, _queue_set);
 
+    // Read from NVS
+    Nvs_NS::Nvs nvs(STORAGE_SPACE);
+    char ip[18] = { 0 };
+    uint32_t port = MQTT_PORT;
+    nvs.read_str(MQTT_HOST_KEY, ip, MQTT_HOST);
+    nvs.read_u32(MQTT_PORT_KEY, &port, &port);
+
     if (find_mqtt_server(_mdns_mqtt_server)) {
         // Connect through mDNS
         mqtt_cfg.uri = _mdns_mqtt_server.full_proto;
         mqtt_cfg.port = _mdns_mqtt_server.port;
+
+        // Write to NVS if different
+        if (strcmp(ip, _mdns_mqtt_server.ip) != 0 || port != _mdns_mqtt_server.port) {
+            nvs.write_str(MQTT_HOST_KEY, _mdns_mqtt_server.ip);
+            nvs.write_u32(MQTT_PORT_KEY, &_mdns_mqtt_server.port);
+        }
     } else {
-        mqtt_cfg.uri = CONFIG_BROKER_URL;
-        mqtt_cfg.port = CONFIG_BROKER_PORT;
+        mqtt_cfg.uri = ip;
+        mqtt_cfg.port = port;
     }
     mqtt_cfg.client_id = CONFIG_CLIENT_ID;
     mqtt_cfg.username = MQTT_USER;
@@ -306,8 +306,8 @@ esp_err_t Mqtt::mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
                 is_http_running = true;
                 vTaskDelete(get_temperature_handle);
                 vTaskDelay(pdMS_TO_TICKS(100));
-                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 2,
-                    Mqtt::_nvs, 5, &http_server_handle);
+                xTaskCreate(&http_server, "HTTP Server", STACK_TASK_SIZE * 2, NULL, 5,
+                    &http_server_handle);
 
             } else if (strncmp(event->data, "DISABLE_HTTP", event->data_len) == 0) {
                 // Restart because OTA conflicting after http server disable

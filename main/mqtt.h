@@ -9,10 +9,10 @@
 #include "mdns.h" // IWYU pragma: keep
 #include "mqtt_client.h"
 #include "mqtt_device.h" // IWYU pragma: keep
-#include "nvs.h"
-#include "nvs_flash.h" // IWYU pragma: keep
-#include "ota.h"       // IWYU pragma: keep
-#include "secrets.h"   // IWYU pragma: keep
+#include "nvs.h"         // IWYU pragma: keep
+#include "nvs_flash.h"   // IWYU pragma: keep
+#include "ota.h"         // IWYU pragma: keep
+#include "secrets.h"     // IWYU pragma: keep
 #include <cstdint>
 
 extern "C" {
@@ -36,7 +36,7 @@ typedef struct {
   char hostname[60];   // hostname
   char ip[16];         // IPv4 (example "192.168.111.222")
   char full_proto[25]; // mqtt://192.168.111.222
-  uint16_t port;       // Port MQTT (1883, 8883 и т.д.)
+  uint32_t port;       // Port MQTT (1883, 8883 и т.д.)
 } MdnsMqttServer_t;
 
 namespace Mqtt_NS {
@@ -93,12 +93,9 @@ private:
   MdnsMqttServer_t _mdns_mqtt_server;
   state_m _mdns_interface_state{state_m::NOT_INITIALISED};
 
-  // NVS
-  static Nvs_NS::Nvs *_nvs;
-
 public:
   Mqtt(EventGroupHandle_t &common_event_group, QueueHandle_t &temperature_queue,
-       QueueHandle_t &percent_queue, Nvs_NS::Nvs *nvs);
+       QueueHandle_t &percent_queue);
   ~Mqtt(void);
   bool find_mqtt_server(MdnsMqttServer_t &mqtt_server);
   void connection_watcher();

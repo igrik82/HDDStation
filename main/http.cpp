@@ -1,30 +1,15 @@
 #include "http.h"
+#include "nvs.h"
 #include "secrets.h"
-#include "string.h"
-#include <cstring>
+#include <cstdint>
 
 namespace Http_NS {
 
 httpd_handle_t HttpServer::_server = NULL;
 esp_vfs_spiffs_conf_t HttpServer::spiffs_config;
-Nvs_NS::Nvs* HttpServer::_nvs = nullptr;
 
-HttpServer::HttpServer(Nvs_NS::Nvs* nvs)
+HttpServer::HttpServer(void)
 {
-
-    HttpServer::_nvs = nvs;
-
-    char wifi_ssid[18] = { 0 };
-    char wifi_password[24] = { 0 };
-    // char wifi_ssid_key[] = WIFI_SSID_KEY;
-    // char wifi_ssid_def[] = WIFI_SSID;
-    char wifi_password_key[] = WIFI_PASSWORD_KEY;
-    char wifi_password_def[] = WIFI_PASSWORD;
-
-    _nvs->read_str(WIFI_SSID_KEY, wifi_ssid, WIFI_SSID);
-    // _nvs->read_str(wifi_password_key, wifi_password, wifi_password_def);
-    ESP_LOGI(HttpServer::TAG, "%s", wifi_ssid);
-    ESP_LOGI(HttpServer::TAG, "%s", wifi_password);
 
     // initialize and mounting SPIFFS
     spiffs_config.base_path = "/spiffs";
@@ -125,18 +110,47 @@ httpd_uri_t root_dir = { .uri = "/",
     .user_ctx = NULL };
 
 // ======================== "/get-wifi-settings" ========================
-static esp_err_t wifi_settings_get_handler(httpd_req_t* req)
+static esp_err_t settings_get_handler(httpd_req_t* req)
 {
 
+    uint32_t min_hdd_temp = MIN_HDD_TEMP;
+    uint32_t max_hdd_temp = MAX_HDD_TEMP;
+    uint32_t frequency = FREQUENCY;
+    float sensor_0_corr = SENSOR_0;
+    float sensor_1_corr = SENSOR_1;
+    char wifi_ssid[18] {};
+    char wifi_password[24] {};
+    char mqtt_user[18] {};
+    char mqtt_password[24] {};
+    char ip[16] {};
+    uint32_t port = MQTT_PORT;
+
+    Nvs_NS::Nvs nvs(STORAGE_SPACE);
+    nvs.read_u32(MIN_HDD_TEMP_KEY, &min_hdd_temp, &min_hdd_temp);
+    nvs.read_u32(MAX_HDD_TEMP_KEY, &max_hdd_temp, &max_hdd_temp);
+    nvs.read_u32(FREQUENCY_KEY, &frequency, &frequency);
+    nvs.read_float(SENSOR_0_KEY, &sensor_0_corr, &sensor_0_corr);
+    nvs.read_float(SENSOR_1_KEY, &sensor_1_corr, &sensor_1_corr);
+    nvs.read_str(WIFI_SSID_KEY, wifi_ssid, WIFI_SSID);
+    nvs.read_str(WIFI_PASSWORD_KEY, wifi_password, WIFI_PASSWORD);
+    nvs.read_str(MQTT_HOST_KEY, ip, MQTT_HOST);
+    nvs.read_u32(MQTT_PORT_KEY, &port, &port);
+    nvs.read_str(MQTT_USER_KEY, mqtt_user, MQTT_USER);
+    nvs.read_str(MQTT_PASSWORD_KEY, mqtt_password, MQTT_PASSWORD);
+
     cJSON* root = cJSON_CreateObject();
-    // cJSON_AddStringToObject(root, "ssid",
-    //     HttpServer::_calibration_data->wifi_ssid);
-    // ESP_LOGI(HttpServer::TAG, "SSID: %s",
-    //     HttpServer::_calibration_data->wifi_ssid);
-    // cJSON_AddStringToObject(root, "wifi_password",
-    //     HttpServer::_calibration_data->wifi_password);
-    // ESP_LOGI(HttpServer::TAG, "Password: %s",
-    //     HttpServer::_calibration_data->wifi_password);
+
+    cJSON_AddNumberToObject(root, "min_temp", min_hdd_temp);
+    cJSON_AddNumberToObject(root, "max_temp", max_hdd_temp);
+    cJSON_AddNumberToObject(root, "fan_freq", frequency);
+    cJSON_AddNumberToObject(root, "sens_corr_0", sensor_0_corr);
+    cJSON_AddNumberToObject(root, "sens_corr_1", sensor_1_corr);
+    cJSON_AddStringToObject(root, "ssid", wifi_ssid);
+    cJSON_AddStringToObject(root, "wifi_password", wifi_password);
+    cJSON_AddStringToObject(root, "mqtt_address", ip);
+    cJSON_AddNumberToObject(root, "mqtt_port", port);
+    cJSON_AddStringToObject(root, "mqtt_user", mqtt_user);
+    cJSON_AddStringToObject(root, "mqtt_password", mqtt_password);
 
     const char* json_str = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -147,9 +161,9 @@ static esp_err_t wifi_settings_get_handler(httpd_req_t* req)
     return ESP_OK;
 }
 
-httpd_uri_t wifi_settings_get = { .uri = "/get-wifi-settings",
+httpd_uri_t settings_get = { .uri = "/get-settings",
     .method = HTTP_GET,
-    .handler = wifi_settings_get_handler,
+    .handler = settings_get_handler,
     .user_ctx = NULL };
 // ======================================================================
 
@@ -177,7 +191,7 @@ esp_err_t HttpServer::start_webserver(void)
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(_server, &root_dir);
-        httpd_register_uri_handler(_server, &wifi_settings_get);
+        httpd_register_uri_handler(_server, &settings_get);
         // httpd_register_uri_handler(server, &echo);
         // httpd_register_uri_handler(server, &ctrl);
         return ESP_OK;

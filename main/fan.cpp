@@ -3,15 +3,19 @@
 namespace Fan_NS {
 // =================== FanPWM constructor ==================
 FanPWM::FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-    QueueHandle_t* duty_percent_queue)
-    : _gpio_num { gpio_num }
-    , _max_duty((LOW_SPEED_MODE_TIMER / _freq_hz) * (2 << (_duty_resolution - 1)))
+    QueueHandle_t* duty_percent_queue, uint32_t* freq_hz,
+    uint32_t* min_hdd_temp, uint32_t* max_hdd_temp)
+    : _min_temp_hdd(min_hdd_temp)
+    , _max_temp_hdd(max_hdd_temp)
+    , _freq_hz(freq_hz)
+    , _gpio_num { gpio_num }
+    , _max_duty((LOW_SPEED_MODE_TIMER / *_freq_hz) * (2 << (_duty_resolution - 1)))
     , _sensor_queue { sensor_queue }
     , _duty_percent_queue { duty_percent_queue }
 {
     // Set timer configuration
     _timer_conf.duty_resolution = _duty_resolution;
-    _timer_conf.freq_hz = _freq_hz;
+    _timer_conf.freq_hz = *_freq_hz;
     _timer_conf.speed_mode = _speed_mode;
     _timer_conf.timer_num = _timer_num;
     // Apply timer configuration
@@ -32,19 +36,6 @@ FanPWM::FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
     _duty = _max_duty;
     ledc_set_duty(_speed_mode, _channel, _duty);
     ledc_update_duty(_speed_mode, _channel);
-}
-FanPWM::FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-    QueueHandle_t* duty_percent_queue, uint32_t freq_hz)
-    : FanPWM(gpio_num, sensor_queue, duty_percent_queue)
-{
-    _timer_conf.freq_hz = _freq_hz;
-}
-FanPWM::FanPWM(uint8_t& gpio_num, QueueHandle_t* sensor_queue,
-    QueueHandle_t* duty_percent_queue, uint32_t freq_hz,
-    uint32_t duty)
-    : FanPWM(gpio_num, sensor_queue, duty_percent_queue, freq_hz)
-{
-    _duty = duty;
 }
 
 // =================== FanPWM member functions ==================
@@ -89,12 +80,12 @@ void FanPWM::start(void)
     // Calculate average
     result = sum / (size - 2);
     // calculate duty
-    if (result <= MIN_TEMP_HDD) {
+    if (result <= *_min_temp_hdd) {
         _duty = 0;
-    } else if (result >= MAX_TEMP_HDD) {
+    } else if (result >= *_max_temp_hdd) {
         _duty = _max_duty;
-    } else if (result >= MIN_TEMP_HDD) {
-        _duty = static_cast<uint32_t>(_max_duty / (MAX_TEMP_HDD - MIN_TEMP_HDD)) * (result - MIN_TEMP_HDD);
+    } else if (result >= *_min_temp_hdd) {
+        _duty = static_cast<uint32_t>(_max_duty / (*_max_temp_hdd - *_min_temp_hdd)) * (result - *_min_temp_hdd);
     }
 
     // Set duty
